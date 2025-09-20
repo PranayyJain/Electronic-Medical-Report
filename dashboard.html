@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Ayush-ICD-11</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f7fafc; }
+        .container { max-width: 1100px; margin: 32px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0056b3; padding-bottom: 12px; margin-bottom: 16px; }
+        .title { color: #0056b3; margin: 0; }
+        a.btn, button.btn { text-decoration: none; background: #0056b3; color: #fff; padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; }
+        a.btn:hover, button.btn:hover { background: #007bff; }
+        .stats { display: flex; gap: 16px; margin-bottom: 16px; }
+        .card { background: #e6f2ff; border: 1.5px solid #0056b3; border-radius: 8px; padding: 12px 16px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 16px; }
+        .controls input, .controls select { padding: 10px 12px; border: 1.5px solid #0056b3; border-radius: 8px; outline: none; }
+        .controls input:focus, .controls select:focus { border-color: #007bff; background: #e6f2ff; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e3eaf3; }
+        th { background: #f0f6ff; color: #0056b3; cursor: pointer; user-select: none; position: sticky; top: 0; z-index: 1; }
+        tr:hover { background: #f8fbff; }
+        .pagination { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+        .chart-wrap { width: 100%; overflow-x: auto; }
+        .chart-wrap svg text { font-family: 'Segoe UI', Arial, sans-serif; }
+        .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; background: #f0f6ff; border: 1px solid #cfe3ff; padding: 4px 8px; border-radius: 6px; }
+        .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.18); display: none; align-items: center; justify-content: center; z-index: 999; }
+        .modal-content { background: #fff; border-radius: 12px; padding: 24px; max-width: 600px; width: 92%; box-shadow: 0 4px 24px rgba(0,0,0,0.18); }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+    </style>
+    <link rel="icon" href="data:,">
+    <script>
+    let masterData = [];
+    let filteredData = [];
+    let sortKey = 'namasteCode';
+    let sortDir = 'asc';
+    let currentPage = 1;
+    let pageSize = 10;
+
+    async function loadData() {
+        const res = await fetch('/api/all');
+        masterData = await res.json();
+        document.getElementById('pageSize').value = '10';
+        applyFiltersAndRender();
+        wireEvents();
+    }
+
+    function wireEvents() {
+        document.getElementById('dashSearch').addEventListener('input', () => { currentPage = 1; applyFiltersAndRender(); });
+        document.getElementById('filterField').addEventListener('change', () => { currentPage = 1; applyFiltersAndRender(); });
+        document.getElementById('pageSize').addEventListener('change', (e) => { pageSize = parseInt(e.target.value); currentPage = 1; renderTable(); });
+        document.getElementById('prevPage').addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderTable(); } });
+        document.getElementById('nextPage').addEventListener('click', () => { const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize)); if (currentPage < totalPages) { currentPage++; renderTable(); } });
+        document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
+        document.querySelectorAll('th[data-key]').forEach(th => th.addEventListener('click', () => onSort(th.getAttribute('data-key'))));
+        document.getElementById('closeModal').addEventListener('click', closeModal);
+        document.getElementById('sendToEmr').addEventListener('click', sendToEmr);
+    }
+
+    function applyFiltersAndRender() {
+        const query = document.getElementById('dashSearch').value.trim().toLowerCase();
+        const field = document.getElementById('filterField').value;
+        filteredData = masterData.filter(item => {
+            if (!query) return true;
+            if (field === 'all') {
+                return Object.values(item).some(v => String(v).toLowerCase().includes(query));
+            }
+            return String(item[field] || '').toLowerCase().includes(query);
+        });
+        renderStats();
+        onSort(sortKey, true); // sort and render
+        renderCharts();
+    }
+
+    function onSort(key, keepDir=false) {
+        if (!keepDir) {
+            if (sortKey === key) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+            else { sortKey = key; sortDir = 'asc'; }
+        }
+        filteredData.sort((a,b) => {
+            const av = String(a[key] || '').toLowerCase();
+            const bv = String(b[key] || '').toLowerCase();
+            if (av < bv) return sortDir === 'asc' ? -1 : 1;
+            if (av > bv) return sortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+        currentPage = 1;
+        renderTable();
+        updateSortIndicators();
+    }
+
+    function updateSortIndicators() {
+        document.querySelectorAll('th[data-key]').forEach(th => {
+            const key = th.getAttribute('data-key');
+            const arrow = key === sortKey ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
+            th.textContent = th.getAttribute('data-label') + arrow;
+        });
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('tbody');
+        tbody.innerHTML = '';
+        const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+        currentPage = Math.min(currentPage, totalPages);
+        const start = (currentPage - 1) * pageSize;
+        const pageItems = filteredData.slice(start, start + pageSize);
+        pageItems.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.namasteCode}</td>
+                <td>${item.namasteTerm}</td>
+                <td>${item.icd11Tm2Code}</td>
+                <td>${item.icd11Tm2Term}</td>
+                <td>${item.icd11BiomedicineCode}</td>
+                <td>${item.icd11BiomedicineTerm}</td>
+            `;
+            tr.addEventListener('click', () => openModal(item));
+            tbody.appendChild(tr);
+        });
+        document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages} • ${filteredData.length} results`;
+    }
+
+    function renderStats() {
+        document.getElementById('totalCount').textContent = filteredData.length;
+        const uniqueBiomedCodes = new Set(filteredData.map(d => d.icd11BiomedicineCode));
+        document.getElementById('uniqueBiomed').textContent = uniqueBiomedCodes.size;
+    }
+
+    function renderCharts() {
+        const counts = {};
+        filteredData.forEach(d => {
+            const code = String(d.icd11Tm2Code || 'N/A');
+            const group = code.split('-')[0] + '-' + (code.split('-')[1] || ''); // TM2-xx
+            counts[group] = (counts[group] || 0) + 1;
+        });
+        // (Bar chart removed)
+
+        // Donut chart
+        const sortedAll = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+        const topN = sortedAll.slice(0,5);
+        const othersCount = sortedAll.slice(5).reduce((s, [,v]) => s+v, 0);
+        const donutSeries = othersCount > 0 ? [...topN, ['Other', othersCount]] : topN;
+        const total = donutSeries.reduce((s, [,v]) => s+v, 0) || 1;
+        const colors = ['#0056b3','#1e88e5','#63a4ff','#94b8ff','#cfe3ff','#7aa2d6'];
+        const cx = 180, cy = 140, r = 80, sw = 28;
+        let start = -Math.PI/2;
+        const donutSvg = [`<svg width="480" height="280" viewBox="0 0 480 280" xmlns="http://www.w3.org/2000/svg">`];
+        donutSvg.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff"/>`);
+        function arcPath(cx, cy, r, startAngle, endAngle) {
+            const x1 = cx + r * Math.cos(startAngle);
+            const y1 = cy + r * Math.sin(startAngle);
+            const x2 = cx + r * Math.cos(endAngle);
+            const y2 = cy + r * Math.sin(endAngle);
+            const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
+            return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
+        }
+        donutSeries.forEach(([label, value], i) => {
+            const angle = (value/total) * Math.PI * 2;
+            const end = start + angle;
+            const path = arcPath(cx, cy, r, start, end);
+            donutSvg.push(`<path d="${path}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="${sw}"/>`);
+            start = end;
+        });
+        donutSvg.push(`<text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="16" fill="#0056b3">Total</text>`);
+        donutSvg.push(`<text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="18" font-weight="600" fill="#0056b3">${total}</text>`);
+        donutSvg.push(`</svg>`);
+        const legend = [`<div class="legend">`];
+        donutSeries.forEach(([label, value], i) => {
+            const pct = Math.round((value/total)*100);
+            legend.push(`<div class="legend-item"><span class="legend-swatch" style="background:${colors[i % colors.length]}"></span><span>${label} — ${value} (${pct}%)</span></div>`);
+        });
+        legend.push(`</div>`);
+        document.getElementById('chartDonut').innerHTML = donutSvg.join('') + legend.join('');
+    }
+
+    function exportCsv() {
+        const headers = ['namasteCode','namasteTerm','icd11Tm2Code','icd11Tm2Term','icd11BiomedicineCode','icd11BiomedicineTerm'];
+        const lines = [headers.join(',')].concat(filteredData.map(r => headers.map(h => `"${String(r[h]||'').replace(/"/g,'""')}"`).join(',')));
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'records.csv'; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    let modalItem = null;
+    function openModal(item) {
+        modalItem = item;
+        const pre = document.getElementById('detailPre');
+        pre.textContent = JSON.stringify(item, null, 2);
+        document.getElementById('detailModal').style.display = 'flex';
+    }
+    function closeModal() {
+        document.getElementById('detailModal').style.display = 'none';
+    }
+    function sendToEmr() {
+        if (!modalItem) return;
+        localStorage.setItem('selectedDiagnosis', JSON.stringify(modalItem));
+        window.location.href = '/';
+    }
+
+    window.addEventListener('DOMContentLoaded', loadData);
+    </script>
+    </head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2 class="title">Dashboard</h2>
+            <a class="btn" href="/">Back to EMR</a>
+        </div>
+        <div class="controls">
+            <input id="dashSearch" type="text" placeholder="Search..." style="min-width:240px;">
+            <select id="filterField">
+                <option value="all">All fields</option>
+                <option value="namasteCode">NAMASTE Code</option>
+                <option value="namasteTerm">NAMASTE Term</option>
+                <option value="icd11Tm2Code">ICD-11 TM2 Code</option>
+                <option value="icd11Tm2Term">ICD-11 TM2 Term</option>
+                <option value="icd11BiomedicineCode">Biomedical Code</option>
+                <option value="icd11BiomedicineTerm">Biomedical Term</option>
+            </select>
+            <select id="pageSize">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+            </select>
+            <button id="exportCsvBtn" class="btn">Export CSV</button>
+        </div>
+        <div class="stats">
+            <div class="card">Total Records: <b id="totalCount">0</b></div>
+            <div class="card">Unique Biomed Codes: <b id="uniqueBiomed">0</b></div>
+        </div>
+        
+        <div class="card" style="margin-bottom:16px;">
+            <div style="font-weight:600; color:#0056b3; margin-bottom:8px;">TM2 Share</div>
+            <div class="chart-wrap" id="chartDonut"></div>
+        </div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th data-key="namasteCode" data-label="NAMASTE Code">NAMASTE Code</th>
+                        <th data-key="namasteTerm" data-label="NAMASTE Term">NAMASTE Term</th>
+                        <th data-key="icd11Tm2Code" data-label="ICD-11 TM2 Code">ICD-11 TM2 Code</th>
+                        <th data-key="icd11Tm2Term" data-label="ICD-11 TM2 Term">ICD-11 TM2 Term</th>
+                        <th data-key="icd11BiomedicineCode" data-label="Biomedical Code">Biomedical Code</th>
+                        <th data-key="icd11BiomedicineTerm" data-label="Biomedical Term">Biomedical Term</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
+        <div class="pagination">
+            <button id="prevPage" class="btn">Prev</button>
+            <div id="pageInfo"></div>
+            <button id="nextPage" class="btn">Next</button>
+        </div>
+    </div>
+
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0; color:#0056b3;">Record Details</h3>
+            <pre id="detailPre" style="background:#f0f6ff; padding:16px; border-radius:8px; max-height:60vh; overflow:auto;"></pre>
+            <div class="modal-actions">
+                <button id="closeModal" class="btn" style="background:#94a3b8;">Close</button>
+                <button id="sendToEmr" class="btn">Send to EMR</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

@@ -195,6 +195,7 @@
         <div class="report-header">
             <span class="hospital-title">Apple Hospital Indore</span>
             <h2 class="report-title">Electronic Medical Report</h2>
+            <a href="/dashboard" style="margin-left:auto; text-decoration:none; background:#0056b3; color:#fff; padding:8px 14px; border-radius:8px;">Dashboard</a>
         </div>
         <div class="patient-info">
             <strong>Patient Name:</strong> <input type="text" id="patientName" placeholder="Enter Name"><br>
@@ -340,6 +341,22 @@
         function closeFhirModal() {
             document.getElementById('fhirModal').style.display = 'none';
         }
+
+        // If user sent a record from Dashboard, prefill translation
+        (function preloadFromDashboard(){
+            try {
+                const raw = localStorage.getItem('selectedDiagnosis');
+                if (!raw) return;
+                const item = JSON.parse(raw);
+                localStorage.removeItem('selectedDiagnosis');
+                selectedDiagnosis = item;
+                showTranslation(item);
+                document.getElementById('searchInput').value = item.namasteTerm || '';
+                displayResults([item]);
+            } catch (e) {
+                // no-op
+            }
+        })();
     </script>
 </body>
 </html>

@@ -242,6 +242,16 @@ def index():
 def favicon():
     return ('', 204)
 
+# Dashboard page
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html')
+
+# API to return all records (for dashboard)
+@app.route('/api/all', methods=['GET'])
+def get_all_records():
+    return jsonify(MOCK_DATABASE)
+
 # This is the API endpoint that will handle the autocomplete search.
 @app.route('/api/autocomplete', methods=['GET'])
 def autocomplete():
