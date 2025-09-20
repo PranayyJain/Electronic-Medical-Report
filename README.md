@@ -5,6 +5,8 @@ A minimal Flask app that serves a front-end page and an autocomplete API over a 
 ### Features
 - Serves `index.html` via Flask
 - `/api/autocomplete?query=...` returns filtered matches across multiple fields
+- `/dashboard` page with filters, sorting, pagination, CSV export
+- Donut chart (TM2 Share) that updates with filters
 
 ### Requirements
 - Python 3.10+
@@ -25,6 +27,7 @@ python app.py
 
 - App: `http://localhost:5000/`
 - API: `http://localhost:5000/api/autocomplete?query=jwara`
+- Dashboard: `http://localhost:5000/dashboard`
 
 ### API Example
 ```bash
@@ -57,11 +60,19 @@ This looks for `index.html` in the repo root (same folder as `app.py`).
 
 ### Deploy to Render
 1. Push this repo to GitHub.
-2. In Render, create a new Web Service from the repo.
-3. It will detect `render.yaml` and auto-configure:
+2. On Render: New → Blueprint → pick this repo (uses `render.yaml`).
+3. Render sets:
    - Build: `pip install -r requirements.txt`
    - Start: `gunicorn app:app --bind 0.0.0.0:$PORT`
-4. Once deployed, visit the generated URL.
+4. Deploy. To redeploy after changes: push to `main` (auto-deploy) or use Manual Deploy.
+
+### Update on GitHub
+```powershell
+cd D:\bhumi
+git add -A
+git commit -m "Dashboard + donut chart + fixes"
+git push origin main
+```
 
 ### Procfile (Heroku-compatible)
 If using platforms that read `Procfile`, it's included:
