@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayush-ICD-11 Terminology Service</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            background: #f7fafc;
+        }
+        .report-container {
+            max-width: 700px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 32px 24px;
+        }
+        .report-header {
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            justify-content: space-between;
+        }
+        .hospital-title {
+            font-size: 1.2rem;
+            color: #222;
+            font-weight: 600;
+            margin-right: 16px;
+        }
+        .report-title {
+            font-size: 2rem;
+            color: #0056b3;
+            margin: 0;
+        }
+        .section-title {
+            font-size: 1.2rem;
+            color: #0056b3;
+            margin-bottom: 8px;
+            margin-top: 24px;
+        }
+        .patient-info {
+            margin-bottom: 16px;
+            background: #e6f2ff;
+            padding: 12px 16px;
+            border-radius: 8px;
+        }
+        .diagnosis-section {
+            background: #f0f6ff;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,86,179,0.08);
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 14px;
+            font-size: 17px;
+            border: 1.5px solid #0056b3;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: #007bff;
+            background: #e6f2ff;
+        }
+        input[type="number"], select {
+            padding: 14px;
+            font-size: 17px;
+            border: 1.5px solid #0056b3;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="number"]:focus, select:focus {
+            border-color: #007bff;
+            background: #e6f2ff;
+        }
+        .results-container {
+            border: none;
+            background: #fff;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .result-item {
+            padding: 14px 12px;
+            border-bottom: 1px solid #e3eaf3;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .result-item:hover {
+            background-color: #dbefff;
+        }
+        .code {
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .term {
+            color: #222;
+        }
+        .translation-card {
+            border: 1.5px solid #0056b3;
+            padding: 24px;
+            margin-top: 24px;
+            background-color: #e6f2ff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,86,179,0.08);
+        }
+        .translation-card h4 {
+            margin-top: 0;
+            color: #0056b3;
+        }
+        .button-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        button {
+            padding: 10px 22px;
+            border-radius: 8px;
+            border: none;
+            background: #0056b3;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #007bff;
+        }
+        .fhir-preview-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.18);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+        .fhir-preview-content {
+            background: #fff;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+        }
+        .close-btn {
+            background: #e6f2ff;
+            color: #0056b3;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 16px;
+            font-size: 1rem;
+            cursor: pointer;
+            float: right;
+            margin-bottom: 12px;
+        }
+        pre {
+            background: #f0f6ff;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            overflow-x: auto;
+        }
+        @media (max-width: 700px) {
+            .report-container {
+                padding: 16px 8px;
+            }
+            .translation-card {
+                padding: 16px;
+            }
+            .fhir-preview-content {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <div class="report-header">
+            <span class="hospital-title">Apple Hospital Indore</span>
+            <h2 class="report-title">Electronic Medical Report</h2>
+        </div>
+        <div class="patient-info">
+            <strong>Patient Name:</strong> <input type="text" id="patientName" placeholder="Enter Name"><br>
+            <strong>Age:</strong> <input type="number" id="patientAge" placeholder="Enter Age" style="width: 120px;"><br>
+            <strong>Gender:</strong> <select id="patientGender" style="width: 120px;">
+                <option value="">Select</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Others</option>
+            </select><br>
+            <strong>Date:</strong> <span id="reportDate"></span>
+        </div>
+        <div class="diagnosis-section">
+            <div class="section-title">Diagnosis</div>
+            <input type="text" id="searchInput" placeholder="Search for a disease or code...">
+            <div id="resultsContainer" class="results-container"></div>
+            <div id="translationOutput"></div>
+        </div>
+        <div class="button-row">
+            <button id="saveBtn">Save EMR</button>
+            <button id="fhirExportBtn">FHIR Export</button>
+            <button id="fhirPreviewBtn" style="display:none;">Preview FHIR</button>
+        </div>
+    </div>
+    <div id="fhirModal" class="fhir-preview-modal" style="display:none;">
+        <div class="fhir-preview-content">
+            <button class="close-btn" onclick="closeFhirModal()">Close</button>
+            <h3>FHIR Patient Resource (JSON)</h3>
+            <pre id="fhirJsonPreview"></pre>
+        </div>
+    </div>
+    <script>
+        document.getElementById('reportDate').textContent = new Date().toLocaleDateString();
+
+        let selectedDiagnosis = null;
+
+        async function fetchAutocompleteResults(query) {
+            const response = await fetch(`/api/autocomplete?query=${encodeURIComponent(query)}`);
+            const results = await response.json();
+            return results;
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('resultsContainer');
+            const translationContainer = document.getElementById('translationOutput'); 
+            
+            container.innerHTML = '';
+            if (translationContainer) {
+                translationContainer.innerHTML = ''; 
+            }
+
+            if (results.length > 0) {
+                results.forEach(item => {
+                    const div = document.createElement('div');
+                    div.classList.add('result-item');
+                    div.innerHTML = `
+                        <span class="code">${item.namasteCode}</span> - <span class="term">${item.namasteTerm}</span> (Ayush)<br>
+                        <span class="code">${item.icd11BiomedicineCode}</span> - <span class="term">${item.icd11BiomedicineTerm}</span> (Biomedicine)
+                    `;
+                    
+                    div.addEventListener('click', () => {
+                        showTranslation(item);
+                        selectedDiagnosis = item;
+                    });
+                    
+                    container.appendChild(div);
+                });
+            } else {
+                container.innerHTML = '<p style="padding: 10px;">No matching results found.</p>';
+            }
+        }
+
+        function showTranslation(item) {
+            const container = document.getElementById('translationOutput');
+            container.innerHTML = `
+                <div class="translation-card">
+                    <h4>Full Translation:</h4>
+                    <p>
+                        <b>Ayush NAMASTE:</b> ${item.namasteCode} - ${item.namasteTerm}<br>
+                        <b>WHO ICD-11 TM2:</b> ${item.icd11Tm2Code} - ${item.icd11Tm2Term}<br>
+                        <b>WHO ICD-11 Biomedicine:</b> ${item.icd11BiomedicineCode} - ${item.icd11BiomedicineTerm}
+                    </p>
+                </div>
+            `;
+        }
+
+        document.getElementById('searchInput').addEventListener('input', async (event) => {
+            const query = event.target.value.trim();
+            if (query.length > 2) {
+                const results = await fetchAutocompleteResults(query);
+                displayResults(results);
+            } else {
+                document.getElementById('resultsContainer').innerHTML = '';
+            }
+        });
+
+        // Save EMR button
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            alert('EMR Saved! (Demo)');
+            // Implement actual save logic as needed
+        });
+
+        // FHIR Export button
+        document.getElementById('fhirExportBtn').addEventListener('click', () => {
+            if (!selectedDiagnosis) {
+                alert('Please select a diagnosis first.');
+                return;
+            }
+            document.getElementById('fhirPreviewBtn').style.display = 'inline-block';
+            alert('FHIR Exported! (Demo)');
+            // Implement actual export logic as needed
+        });
+
+        // FHIR Preview button
+        document.getElementById('fhirPreviewBtn').addEventListener('click', () => {
+            const patientName = document.getElementById('patientName').value || '';
+            const patientAge = document.getElementById('patientAge').value || '';
+            const patientGender = document.getElementById('patientGender').value || '';
+            const diagnosis = selectedDiagnosis || {};
+
+            // Example FHIR Patient resource (minimal, for demo)
+            const fhirData = {
+                resourceType: "Patient",
+                name: [{ text: patientName }],
+                gender: patientGender.toLowerCase(),
+                birthDate: patientAge ? (new Date().getFullYear() - parseInt(patientAge)).toString() : "",
+                extension: [
+                    {
+                        url: "http://example.org/fhir/StructureDefinition/diagnosis",
+                        valueString: diagnosis.namasteTerm || ""
+                    },
+                    {
+                        url: "http://example.org/fhir/StructureDefinition/icd11",
+                        valueString: diagnosis.icd11BiomedicineCode || ""
+                    }
+                ]
+            };
+
+            document.getElementById('fhirJsonPreview').textContent = JSON.stringify(fhirData, null, 2);
+            document.getElementById('fhirModal').style.display = 'flex';
+        });
+
+        function closeFhirModal() {
+            document.getElementById('fhirModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
